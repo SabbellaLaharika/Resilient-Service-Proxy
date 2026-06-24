@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  external-mock-service:
+    build:
+      context: ./external_mock_service
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - EXTERNAL_FAIL_RATE=0.0
+      - EXTERNAL_LATENCY_MS=0
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+
+  proxy-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      external-mock-service:
+        condition: service_healthy
+    environment:
+      - EXTERNAL_SERVICE_URL=http://external-mock-service:5001/external-api/process
+      - RATE_LIMIT_WINDOW_SECONDS=60
+      - RATE_LIMIT_MAX_REQUESTS=10
+      - CB_FAILURE_THRESHOLD=5
+      - CB_RESET_TIMEOUT_SECONDS=30
+      - RETRY_MAX_ATTEMPTS=3
+      - RETRY_INITIAL_DELAY_MS=100
+      - RETRY_BACKOFF_MULTIPLIER=2
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
