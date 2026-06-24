@@ -17,9 +17,15 @@ def health():
 
 @app.post("/external-api/process")
 async def process(request: Request):
-    # Read environment variables on each request to allow dynamic overrides during testing
-    fail_rate_str = os.environ.get("EXTERNAL_FAIL_RATE", "0.0")
-    latency_ms_str = os.environ.get("EXTERNAL_LATENCY_MS", "0")
+    # Echo back the received JSON payload
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    # Read from payload first, fallback to environment variables
+    fail_rate_str = str(payload.get("fail_rate", os.environ.get("EXTERNAL_FAIL_RATE", "0.0")))
+    latency_ms_str = str(payload.get("latency_ms", os.environ.get("EXTERNAL_LATENCY_MS", "0")))
     
     try:
         fail_rate = float(fail_rate_str)
@@ -48,11 +54,7 @@ async def process(request: Request):
                 content={"message": "Internal Server Error"}
             )
             
-    # Echo back the received JSON payload
-    try:
-        payload = await request.json()
-    except Exception:
-        payload = {}
+    # Return payload
         
     logger.info("Successfully processed request")
     return payload
