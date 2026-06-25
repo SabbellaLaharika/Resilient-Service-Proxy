@@ -31,6 +31,7 @@ async def test_integration_rate_limiting():
                 response = await client.post(
                     f"{PROXY_URL}/api/proxy/data", 
                     json={"test": i, "fail_rate": 0.0},
+                    headers={"x-client-id": "rate-limit-test-client"},
                     timeout=5.0
                 )
                 return response.status_code
@@ -57,11 +58,13 @@ async def test_integration_circuit_breaker_and_recovery():
         # We need to send CB_FAILURE_THRESHOLD (5) requests that return 5xx errors.
         # We do this by passing fail_rate=1.0 in the payload.
         failures = 0
+        headers = {"x-client-id": "cb-test-client"}
         for i in range(5):
             try:
                 response = await client.post(
                     f"{PROXY_URL}/api/proxy/data",
                     json={"test": f"fail-{i}", "fail_rate": 1.0},
+                    headers=headers,
                     timeout=5.0
                 )
                 if response.status_code == 500:
@@ -72,6 +75,7 @@ async def test_integration_circuit_breaker_and_recovery():
                     response = await client.post(
                         f"{PROXY_URL}/api/proxy/data",
                         json={"test": f"fail-{i}-retry", "fail_rate": 1.0},
+                        headers=headers,
                         timeout=5.0
                     )
                     if response.status_code == 500:
@@ -84,6 +88,7 @@ async def test_integration_circuit_breaker_and_recovery():
         response = await client.post(
             f"{PROXY_URL}/api/proxy/data",
             json={"test": "probe-open", "fail_rate": 0.0},
+            headers=headers,
             timeout=5.0
         )
         assert response.status_code == 503

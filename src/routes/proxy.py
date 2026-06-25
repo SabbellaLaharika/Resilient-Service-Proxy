@@ -13,10 +13,10 @@ router = APIRouter()
 
 @router.post("/api/proxy/data")
 async def proxy_data(request: Request):
-    # Step 1: Extract client identifier and check Rate Limiter
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    # Step 1: Extract client identifier (supports IP or mock user token header) and check Rate Limiter
+    client_id = request.headers.get("x-client-id") or (request.client.host if request.client else "127.0.0.1")
     
-    allowed = await rate_limiter.check_limit(client_ip)
+    allowed = await rate_limiter.check_limit(client_id)
     if not allowed:
         return JSONResponse(
             status_code=429,
