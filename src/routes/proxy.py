@@ -30,14 +30,19 @@ async def proxy_data(request: Request):
         payload = {}
 
     # Step 2 & 3: Wrap request in Retry Strategy and Circuit Breaker
+    # Reuse shared client from FastAPI app state to leverage HTTP connection pooling
+    http_client: httpx.AsyncClient = getattr(request.app.state, "http_client", None)
+
     async def retry_action():
-        # We use a new client or shared client. A context manager ensures connection cleanup.
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            logger.info(f"Forwarding request to downstream: {settings.EXTERNAL_SERVICE_URL}")
-            response = await client.post(settings.EXTERNAL_SERVICE_URL, json=payload)
-            # Raise status error so with_retry can inspect it and trigger retries
-            response.raise_for_status()
-            return response
+        logger.info(f"Forwarding request to downstream: {settings.EXTERNAL_SERVICE_URL}")
+        if http_client is not None:
+            response = await http_client.post(settings.EXTERNAL_SERVICE_URL, json=payload)
+        else:
+            async with httpx.AsyncClient(timeout=10.0) as fallback_client:
+                response = await fallback_client.post(settings.EXTERNAL_SERVICE_URL, json=payload)
+        # Raise status error so with_retry can inspect it and trigger retries
+        response.raise_for_status()
+        return response
 
     async def cb_action():
         return await with_retry(

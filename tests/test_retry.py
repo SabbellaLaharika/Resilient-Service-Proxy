@@ -65,3 +65,19 @@ async def test_retry_network_error_exhausted():
         await with_retry(action, max_attempts=3, initial_delay_ms=10, backoff_multiplier=2)
         
     assert len(calls) == 3
+
+@pytest.mark.asyncio
+async def test_retry_with_jitter():
+    calls = []
+    
+    async def action():
+        calls.append(time.time())
+        if len(calls) < 2:
+            request = httpx.Request("POST", "http://test")
+            response = httpx.Response(503, request=request)
+            raise httpx.HTTPStatusError("Service Unavailable", request=request, response=response)
+        return "recovered"
+
+    result = await with_retry(action, max_attempts=3, initial_delay_ms=20, backoff_multiplier=2, jitter=True)
+    assert result == "recovered"
+    assert len(calls) == 2

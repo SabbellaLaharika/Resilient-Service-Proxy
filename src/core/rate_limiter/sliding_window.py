@@ -17,24 +17,44 @@ class RateLimiter:
         """
         Evaluate the current request for a given client_id.
         Returns True if the request is allowed (within quota), False if rate-limited.
+        Evicts expired timestamps and cleans up empty client keys to prevent memory leaks.
         """
         async with self.lock:
             now = time.time()
             cutoff = now - self.window_seconds
             
-            # Clean up old timestamps
+            # Clean up old timestamps for the incoming client
             if client_id in self.store:
-                # Keep timestamps inside the window
-                self.store[client_id] = [t for t in self.store[client_id] if t > cutoff]
-            else:
-                self.store[client_id] = []
+                valid_timestamps = [t for t in self.store[client_id] if t > cutoff]
+                if valid_timestamps:
+                    self.store[client_id] = valid_timestamps
+                else:
+                    # Evict empty key immediately to prevent memory bloat
+                    del self.store[client_id]
                 
-            current_requests = len(self.store[client_id])
+            current_requests = len(self.store.get(client_id, []))
             
             if current_requests < self.max_requests:
+                if client_id not in self.store:
+                    self.store[client_id] = []
                 self.store[client_id].append(now)
                 logger.info(f"RateLimiter: client={client_id} allowed ({current_requests + 1}/{self.max_requests})")
                 return True
             else:
                 logger.warning(f"RateLimiter: client={client_id} rate-limited ({current_requests}/{self.max_requests})")
                 return False
+
+    def evict_expired(self, current_time: float = None) -> int:
+        """
+        Evicts all client keys whose timestamps have completely expired outside the window.
+        Returns the number of evicted keys.
+        """
+        now = current_time or time.time()
+        cutoff = now - self.window_seconds
+        expired_clients = [
+            cid for cid, timestamps in self.store.items()
+            if not any(t > cutoff for t in timestamps)
+        ]
+        for cid in expired_clients:
+            del self.store[cid]
+        return len(expired_clients)

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 import httpx
 
 logger = logging.getLogger("retry")
@@ -8,11 +9,12 @@ async def with_retry(
     action_func, 
     max_attempts: int, 
     initial_delay_ms: int, 
-    backoff_multiplier: float
+    backoff_multiplier: float,
+    jitter: bool = False
 ):
     """
     Executes the action_func in a loop, retrying up to max_attempts times on transient errors
-    with exponential backoff.
+    with exponential backoff. Optional full jitter prevents synchronized retry storms.
     """
     attempts = 0
     while True:
@@ -29,6 +31,9 @@ async def with_retry(
                     # Here, attempt index is 0-based for the delay duration calculation.
                     attempt_index = attempts - 1
                     delay_sec = (initial_delay_ms / 1000.0) * (backoff_multiplier ** attempt_index)
+                    if jitter:
+                        # Full jitter uniformly distributes delay to spread out synchronized retries
+                        delay_sec = random.uniform(0.5 * delay_sec, delay_sec)
                     logger.warning(
                         f"Transient HTTP status {status_code} on attempt {attempts}/{max_attempts}. "
                         f"Retrying in {delay_sec:.3f}s..."
@@ -42,6 +47,8 @@ async def with_retry(
             if attempts < max_attempts:
                 attempt_index = attempts - 1
                 delay_sec = (initial_delay_ms / 1000.0) * (backoff_multiplier ** attempt_index)
+                if jitter:
+                    delay_sec = random.uniform(0.5 * delay_sec, delay_sec)
                 logger.warning(
                     f"Transient network error on attempt {attempts}/{max_attempts}: {exc}. "
                     f"Retrying in {delay_sec:.3f}s..."
