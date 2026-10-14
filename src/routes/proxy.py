@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request, Response, Body
 from fastapi.responses import JSONResponse
 import httpx
 import logging
@@ -9,10 +9,13 @@ from src.core.circuit_breaker import CircuitBreakerOpenException
 from src.core.retry import with_retry
 
 logger = logging.getLogger("proxy")
-router = APIRouter()
+DEFAULT_PAYLOAD = {
+    "message": "Hello Resilient World!",
+    "fail_rate": 0.0
+}
 
 @router.post("/api/proxy/data")
-async def proxy_data(request: Request):
+async def proxy_data(request: Request, payload: dict = Body(default=DEFAULT_PAYLOAD)):
     # Step 1: Extract client identifier (supports IP or mock user token header) and check Rate Limiter
     client_id = request.headers.get("x-client-id") or (request.client.host if request.client else "127.0.0.1")
     
@@ -23,11 +26,12 @@ async def proxy_data(request: Request):
             content={"message": "Rate limit exceeded. Please try again later."}
         )
 
-    # Read payload to forward
-    try:
-        payload = await request.json()
-    except Exception:
-        payload = {}
+    # Payload is parsed by FastAPI Body(default={}) or fallback
+    if not payload:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
 
     # Step 2 & 3: Wrap request in Retry Strategy and Circuit Breaker
     # Reuse shared client from FastAPI app state to leverage HTTP connection pooling

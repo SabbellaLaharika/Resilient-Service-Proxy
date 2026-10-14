@@ -2,7 +2,7 @@ import os
 import random
 import asyncio
 import logging
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Body
 from fastapi.responses import JSONResponse
 
 # Setup logging
@@ -15,13 +15,19 @@ app = FastAPI()
 def health():
     return {"status": "healthy"}
 
+DEFAULT_PAYLOAD = {
+    "message": "Hello Resilient World!",
+    "fail_rate": 0.0
+}
+
 @app.post("/external-api/process")
-async def process(request: Request):
+async def process(request: Request, payload: dict = Body(default=DEFAULT_PAYLOAD)):
     # Echo back the received JSON payload
-    try:
-        payload = await request.json()
-    except Exception:
-        payload = {}
+    if not payload:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = DEFAULT_PAYLOAD
 
     # Read from payload first, fallback to environment variables
     fail_rate_str = str(payload.get("fail_rate", os.environ.get("EXTERNAL_FAIL_RATE", "0.0")))

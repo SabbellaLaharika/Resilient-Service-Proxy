@@ -4,7 +4,7 @@
 [![Framework](https://img.shields.io/badge/Framework-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![Concurrency Engine](https://img.shields.io/badge/Concurrency-AsyncIO%20%2F%20HTTPX-success.svg)](https://docs.python.org/3/library/asyncio.html)
 [![Containerization](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
-[![Evaluation Score](https://img.shields.io/badge/Evaluation-100%2F100%20Approved-brightgreen.svg)]()
+
 
 A high-performance, fault-tolerant **API Gateway Reverse Proxy** built strictly from scratch with zero third-party resilience libraries. It safeguards downstream microservices, eliminates cascading failures, and stabilizes traffic across distributed cloud environments using **Sliding Window Log Rate Limiting**, a **Strict 3-State Finite State Machine Circuit Breaker**, and an **Exponential Backoff Retry Engine with Jitter**.
 
